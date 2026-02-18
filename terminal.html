@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Kitchen Employee Terminal</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #0f172a;
+    color: #f1f5f9;
+    padding: 30px;
+}
+
+h2 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #38bdf8;
+}
+
+#orders {
+    max-width: 900px;
+    margin: auto;
+}
+
+.order-card {
+    background: #1e293b;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 12px;
+    box-shadow: 0 0 15px rgba(56,189,248,0.2);
+    transition: 0.3s;
+}
+
+.order-card:hover {
+    box-shadow: 0 0 20px rgba(56,189,248,0.5);
+}
+
+button {
+    padding: 8px 14px;
+    margin-top: 10px;
+    margin-right: 6px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.claim-btn {
+    background: #f59e0b;
+    color: black;
+}
+
+.complete-btn {
+    background: #22c55e;
+    color: black;
+}
+
+.status-pending {
+    color: #facc15;
+}
+
+.status-preparing {
+    color: #38bdf8;
+}
+
+.status-completed {
+    color: #22c55e;
+}
+
+.assigned {
+    color: #cbd5e1;
+}
+</style>
+</head>
+
+<body>
+
+<h2>🌙 Kitchen Employee Terminal</h2>
+
+<div id="orders"></div>
+
+<script>
+const socket = io("http://localhost:3000");
+
+let employeeName = prompt("Enter your name:");
+
+if (!employeeName) {
+    employeeName = "Employee";
+}
+
+// =============================
+// RECEIVE ORDERS
+// =============================
+socket.on("ordersUpdate", (orders) => {
+
+    const ordersDiv = document.getElementById("orders");
+    ordersDiv.innerHTML = "";
+
+    orders.forEach(order => {
+
+        let itemsText = "";
+
+        if (order.items && Array.isArray(order.items)) {
+            order.items.forEach(item => {
+                itemsText += `• ${item.name} x${item.quantity}<br>`;
+            });
+        }
+
+        let statusClass = "";
+        if (order.status === "Pending") statusClass = "status-pending";
+        if (order.status === "Preparing") statusClass = "status-preparing";
+        if (order.status === "Completed") statusClass = "status-completed";
+
+        ordersDiv.innerHTML += `
+            <div class="order-card">
+                <strong>Order ID:</strong> ${order.id}<br>
+                <strong>Customer:</strong> ${order.customer}<br><br>
+
+                <strong>Items:</strong><br>
+                ${itemsText}<br>
+
+                <strong>Message:</strong> ${order.message || "None"}<br><br>
+
+                <span class="${statusClass}">
+                    <strong>Status:</strong> ${order.status}
+                </span><br>
+
+                <span class="assigned">
+                    <strong>Assigned To:</strong> ${order.assignedTo || "Not Assigned"}
+                </span><br>
+
+                ${order.status === "Pending" ? 
+                    `<button class="claim-btn" onclick="claimOrder(${order.id})">Claim</button>` 
+                    : ""}
+
+                ${order.status === "Preparing" && order.assignedTo === employeeName ? 
+                    `<button class="complete-btn" onclick="completeOrder(${order.id})">Complete</button>` 
+                    : ""}
+            </div>
+        `;
+    });
+});
+
+// =============================
+// CLAIM ORDER
+// =============================
+function claimOrder(id) {
+    socket.emit("claimOrder", {
+        id: id,
+        employee: employeeName
+    });
+}
+
+// =============================
+// COMPLETE ORDER
+// =============================
+function completeOrder(id) {
+    socket.emit("completeOrder", {
+        id: id
+    });
+}
+
+// =============================
+// CLAIM FAILED
+// =============================
+socket.on("claimFailed", (message) => {
+    alert(message);
+});
+</script>
+
+</body>
+</html>

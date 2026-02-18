@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Customer Order Portal</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #0f172a;
+    color: #f1f5f9;
+    padding: 40px;
+}
+
+.container {
+    max-width: 500px;
+    margin: auto;
+    background: #1e293b;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 0 20px rgba(56,189,248,0.3);
+    transition: 0.3s;
+}
+
+.container:hover {
+    box-shadow: 0 0 25px rgba(56,189,248,0.6);
+}
+
+h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #38bdf8;
+}
+
+label {
+    font-weight: bold;
+    display: block;
+    margin-top: 15px;
+}
+
+input, select, textarea {
+    width: 100%;
+    padding: 10px;
+    margin-top: 6px;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    background: #0f172a;
+    color: #f1f5f9;
+    font-size: 14px;
+}
+
+textarea {
+    resize: none;
+    height: 70px;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    margin-top: 20px;
+    border-radius: 8px;
+    border: none;
+    background: #38bdf8;
+    color: black;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+button:hover {
+    background: #0ea5e9;
+}
+
+.success {
+    margin-top: 15px;
+    text-align: center;
+    color: #22c55e;
+}
+
+.status {
+    margin-top: 10px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.status-pending {
+    color: #facc15;
+}
+
+.status-preparing {
+    color: #38bdf8;
+}
+
+.status-completed {
+    color: #22c55e;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<h2>🌙 Place Your Order</h2>
+
+<label>Customer Name</label>
+<input type="text" id="customerName" placeholder="Enter your name">
+
+<label>Select Items (Ctrl + Click for multiple)</label>
+<select id="items" multiple>
+    <option value="Burger">Burger</option>
+    <option value="Pizza">Pizza</option>
+    <option value="Fries">Fries</option>
+    <option value="Coke">Coke</option>
+    <option value="Pasta">Pasta</option>
+</select>
+
+<label>Quantity (applies to selected items)</label>
+<input type="number" id="quantity" min="1" value="1">
+
+<label>Special Instructions</label>
+<textarea id="specialMessage" placeholder="No onions, extra cheese..."></textarea>
+
+<button onclick="placeOrder()">Submit Order</button>
+
+<div class="success" id="message"></div>
+<div class="status" id="orderStatus"></div>
+</div>
+
+<script>
+const socket = io("http://localhost:3000");
+
+let currentOrderId = null;
+
+function placeOrder() {
+
+    const name = document.getElementById("customerName").value.trim();
+    const selectedOptions = Array.from(document.getElementById("items").selectedOptions);
+    const quantity = parseInt(document.getElementById("quantity").value);
+    const specialMessage = document.getElementById("specialMessage").value.trim();
+
+    if (!name || selectedOptions.length === 0) {
+        alert("Please enter your name and select at least one item.");
+        return;
+    }
+
+    if (quantity <= 0) {
+        alert("Quantity must be at least 1.");
+        return;
+    }
+
+    const items = selectedOptions.map(option => ({
+        name: option.value,
+        quantity: quantity
+    }));
+
+    currentOrderId = Date.now();
+
+    const order = {
+        id: currentOrderId,
+        customer: name,
+        items: items,
+        message: specialMessage
+    };
+
+    socket.emit("newOrder", order);
+
+    document.getElementById("message").innerText = "Order submitted successfully!";
+    updateStatus("Pending");
+
+    // Clear some fields
+    document.getElementById("quantity").value = 1;
+    document.getElementById("specialMessage").value = "";
+}
+
+// =============================
+// LIVE STATUS UPDATE
+// =============================
+socket.on("statusUpdate", (data) => {
+    if (data.id === currentOrderId) {
+        updateStatus(data.status);
+    }
+});
+
+function updateStatus(status) {
+    const statusDiv = document.getElementById("orderStatus");
+    statusDiv.className = "status";
+
+    if (status === "Pending") statusDiv.classList.add("status-pending");
+    if (status === "Preparing") statusDiv.classList.add("status-preparing");
+    if (status === "Completed") statusDiv.classList.add("status-completed");
+
+    statusDiv.innerText = "Status: " + status;
+}
+</script>
+
+</body>
+</html>
